@@ -1,0 +1,428 @@
+import 'package:flutter/material.dart';
+import 'dart:async'; // Required for the mock stream
+
+// --- Main Function and App Initialization ---
+
+void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  // In a real app, you would initialize Firebase here.
+  runApp(const RecipeApp());
+}
+
+class RecipeApp extends StatelessWidget {
+  const RecipeApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Recipe App',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        primarySwatch: Colors.grey,
+        scaffoldBackgroundColor: Colors.white,
+        fontFamily: 'Poppins',
+      ),
+      home: const HomeScreen(),
+    );
+  }
+}
+
+// --- Data Model for a Recipe ---
+
+class Recipe {
+  final String id;
+  final String name;
+  final String imageUrl;
+  final String author;
+  final String description;
+  final int calories;
+  final int totalTime;
+  final int ingredientsCount;
+  final double rating;
+
+  Recipe({
+    required this.id,
+    required this.name,
+    required this.imageUrl,
+    required this.author,
+    required this.description,
+    required this.calories,
+    required this.totalTime,
+    required this.ingredientsCount,
+    required this.rating,
+  });
+
+  // Changed from fromFirestore to fromMap as cloud_firestore is not allowed
+  factory Recipe.fromMap(Map<String, dynamic> data) {
+    return Recipe(
+      id: data['id'] as String? ?? UniqueKey().toString(), // Provide an ID or generate one
+      name: data['name'] as String? ?? 'No Name',
+      imageUrl: data['imageUrl'] as String? ?? 'https://www.gstatic.com/flutter-onestack-prototype/genui/example_1.jpg', // Placeholder image
+      author: data['author'] as String? ?? 'Unknown Author',
+      description: data['description'] as String? ?? '',
+      calories: data['calories'] as int? ?? 0,
+      totalTime: data['totalTime'] as int? ?? 0,
+      ingredientsCount: data['ingredientsCount'] as int? ?? 0,
+      rating: (data['rating'] as num? ?? 0.0).toDouble(), // Handle num (int or double) for flexibility
+    );
+  }
+}
+
+// --- Home Screen ---
+
+class HomeScreen extends StatelessWidget {
+  const HomeScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildHeader(),
+              const SizedBox(height: 24),
+              _buildCategoryList(),
+              const SizedBox(height: 24),
+              _buildRecipeGrid(),
+            ],
+          ),
+        ),
+      ),
+      bottomNavigationBar: _buildBottomNavBar(),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        const Text(
+          'Looking for your\nfavourite meal',
+          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+        ),
+        Row(
+          children: [
+            IconButton(onPressed: () {}, icon: const Icon(Icons.notifications_none)),
+            IconButton(onPressed: () {}, icon: const Icon(Icons.search)),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCategoryList() {
+    final categories = ['Soup Recipies', 'Main Course', 'Grill', 'Dessert'];
+    return SizedBox(
+      height: 120,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: categories.length,
+        itemBuilder: (context, index) {
+          return Padding(
+            padding: const EdgeInsets.only(right: 16.0),
+            child: Column(
+              children: [
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade100,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Center(child: Icon(Icons.ramen_dining, size: 40, color: Colors.red)),
+                ),
+                const SizedBox(height: 8),
+                Text(categories[index]),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildRecipeGrid() {
+    // StreamBuilder type changed from QuerySnapshot to List<Recipe>
+    return StreamBuilder<List<Recipe>>(
+      // To use Firebase, replace `_mockRecipeStream()` with:
+      // FirebaseFirestore.instance.collection('recipes').snapshots().map((snapshot) => snapshot.docs.map((doc) => Recipe.fromFirestore(doc)).toList())
+      stream: _mockRecipeStream(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) return Center(child: Text('Something went wrong: ${snapshot.error}'));
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final recipes = snapshot.data!; // snapshot.data is already List<Recipe>
+        if (recipes.isEmpty) return const Center(child: Text('No recipes found.'));
+
+        // Replaced MasonryGridView.count with GridView.builder as flutter_staggered_grid_view is not allowed
+        return GridView.builder(
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            mainAxisSpacing: 16,
+            crossAxisSpacing: 16,
+            childAspectRatio: 0.7, // Adjusted for typical recipe card content
+          ),
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: recipes.length,
+          itemBuilder: (context, index) => _buildRecipeCard(context, recipes[index]),
+        );
+      },
+    );
+  }
+
+  Widget _buildRecipeCard(BuildContext context, Recipe recipe) {
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute<void>(builder: (context) => RecipeDetailScreen(recipe: recipe)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12.0),
+            // Replaced CachedNetworkImage with Image.network as cached_network_image is not allowed
+            child: Image.network(
+              recipe.imageUrl,
+              fit: BoxFit.cover,
+              width: double.infinity, // Ensures image fills available width in grid item
+              height: 150, // Fixed height for consistent grid item size
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return Container(
+                  height: 150,
+                  color: Colors.grey[200],
+                  child: Center(
+                    child: CircularProgressIndicator(
+                      value: loadingProgress.expectedTotalBytes != null
+                          ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                          : null,
+                    ),
+                  ),
+                );
+              },
+              errorBuilder: (context, error, stackTrace) => Container(
+                height: 150,
+                color: Colors.grey[200],
+                child: const Icon(Icons.error, color: Colors.red),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(recipe.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+          Text(recipe.author, style: const TextStyle(color: Colors.grey)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBottomNavBar() {
+    return BottomNavigationBar(
+      type: BottomNavigationBarType.fixed,
+      selectedItemColor: Colors.deepOrange,
+      unselectedItemColor: Colors.grey,
+      items: const [
+        BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+        BottomNavigationBarItem(icon: Icon(Icons.calendar_today), label: 'Meal Plan'),
+        BottomNavigationBarItem(icon: Icon(Icons.subscriptions), label: 'Subscription'),
+        BottomNavigationBarItem(icon: Icon(Icons.more_horiz), label: 'More'),
+      ],
+    );
+  }
+}
+
+// --- Recipe Detail Screen ---
+
+class RecipeDetailScreen extends StatelessWidget {
+  final Recipe recipe;
+
+  const RecipeDetailScreen({super.key, required this.recipe});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Stack(
+        children: [
+          Positioned.fill(
+            // Replaced CachedNetworkImage with Image.network
+            child: Image.network(
+              recipe.imageUrl,
+              fit: BoxFit.cover,
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return Container(
+                  color: Colors.grey[200],
+                  child: Center(
+                    child: CircularProgressIndicator(
+                      value: loadingProgress.expectedTotalBytes != null
+                          ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                          : null,
+                    ),
+                  ),
+                );
+              },
+              errorBuilder: (context, error, stackTrace) => Container(
+                color: Colors.grey[200],
+                child: const Icon(Icons.error, color: Colors.red),
+              ),
+            ),
+          ),
+          Positioned(
+            top: 40,
+            left: 10,
+            child: CircleAvatar(
+              backgroundColor: Colors.white.withOpacity(0.8),
+              child: IconButton(
+                icon: const Icon(Icons.arrow_back, color: Colors.black),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            ),
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(30.0),
+                  topRight: Radius.circular(30.0),
+                ),
+              ),
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            recipe.name,
+                            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        const Icon(Icons.favorite_border, color: Colors.grey),
+                      ],
+                    ),
+                    Text(recipe.author, style: const TextStyle(color: Colors.grey)),
+                    const SizedBox(height: 16),
+                    _buildInfoRow(),
+                    const SizedBox(height: 24),
+                    const Text("About Recipe", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    Text(recipe.description, style: const TextStyle(color: Colors.grey, height: 1.5)),
+                    const SizedBox(height: 24),
+                    Center(
+                      child: ElevatedButton(
+                        onPressed: () {},
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.black,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 80, vertical: 20),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        child: const Text('Cook Now'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        _buildInfoItem("Calories", "${recipe.calories} cal"),
+        _buildInfoItem("Ingredients", "${recipe.ingredientsCount}"),
+        _buildInfoItem("Total Time", "${recipe.totalTime} min"),
+      ],
+    );
+  }
+
+  Widget _buildInfoItem(String title, String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+      decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(8)),
+      child: Column(
+        children: [
+          Text(title, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+          const SizedBox(height: 4),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+}
+
+// --- Mock Data and Helper Classes for Offline Development ---
+
+// Stream type changed from QuerySnapshot to List<Recipe>
+Stream<List<Recipe>> _mockRecipeStream() {
+  final List<Map<String, dynamic>> mockData = <Map<String, dynamic>>[
+    {
+      'id': 'recipe_1', // Added explicit ID
+      'name': 'Cheese Grill Sandwich',
+      'author': 'by Sarah Smith',
+      'imageUrl': 'https://images.unsplash.com/photo-1475090169767-40ed8d18f67d?fm=jpg&q=60&w=3000&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NHx8Z3JpbGxlZCUyMGNoZWVzZXxlbnwwfHwwfHx8MA%3D%3D',
+      'description': 'A classic and comforting veg cheese grilled sandwich. This is a quick vegetarian sandwich recipe that can be made in minutes.',
+      'calories': 176,
+      'totalTime': 25,
+      'ingredientsCount': 6,
+      'rating': 4.5,
+    },
+    {
+      'id': 'recipe_2',
+      'name': 'Spicy Fish Curry',
+      'author': 'by Joshua',
+      'imageUrl': 'https://images.unsplash.com/photo-1626508035297-0cd27c397d67?fm=jpg&q=60&w=3000&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NHx8ZmlzaCUyMGN1cnJ5fGVufDB8fDB8fHww',
+      'description': 'A fiery and flavorful fish curry, perfect for a hearty meal. Made with a blend of traditional spices and fresh fish.',
+      'calories': 250,
+      'totalTime': 40,
+      'ingredientsCount': 12,
+      'rating': 4.8,
+    },
+     {
+      'id': 'recipe_3',
+      'name': 'Pasta Bolognese',
+      'author': 'by Maria',
+      'imageUrl': 'https://plus.unsplash.com/premium_photo-1664472619078-9db415ebef44?fm=jpg&q=60&w=3000&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8OXx8c3BhZ2hldHRpJTIwYm9sb2duZXNlfGVufDB8fDB8fHww',
+      'description': 'A rich and meaty pasta sauce served with fresh tagliatelle. A true Italian classic that is loved by everyone.',
+      'calories': 450,
+      'totalTime': 75,
+      'ingredientsCount': 10,
+      'rating': 4.9,
+    },
+    {
+      'id': 'recipe_4',
+      'name': 'Avocado Toast',
+      'author': 'by Chloe',
+      'imageUrl': 'https://images.unsplash.com/photo-1482049016688-2d3e1b311543?q=80&w=800',
+      'description': 'A simple and healthy breakfast option. Creamy avocado on top of crispy toasted sourdough bread.',
+      'calories': 220,
+      'totalTime': 10,
+      'ingredientsCount': 5,
+      'rating': 4.3,
+    },
+  ];
+
+  // Map mock data to Recipe objects directly and return a stream of List<Recipe>
+  final List<Recipe> recipes = mockData.map<Recipe>((Map<String, dynamic> data) => Recipe.fromMap(data)).toList();
+  return Stream<List<Recipe>>.value(recipes);
+}
+
+// Removed _MockQuerySnapshot and _MockDocumentSnapshot as cloud_firestore is not allowed
