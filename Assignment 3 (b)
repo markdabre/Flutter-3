@@ -1,0 +1,257 @@
+import 'package:flutter/material.dart';
+
+// --- Main App Entry Point ---
+void main() {
+  runApp(const RecipeApp());
+}
+
+class RecipeApp extends StatelessWidget {
+  const RecipeApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    // This is the mock data object that feeds the UI.
+    // In a real app, you would fetch this from Firebase.
+    final Recipe sampleRecipe = Recipe(
+      name: 'Cheese Grill Sandwich',
+      author: 'by Sarah Smith',
+      imageUrl: 'https://images.unsplash.com/photo-1475090169767-40ed8d18f67d?fm=jpg&q=60&w=3000&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NHx8Z3JpbGxlZCUyMGNoZWVzZXxlbnwwfHwwfHx8MA%3D%3D', // Replaced with valid placeholder URL
+      description: 'Veg cheese grilled sandwich / vegetable cheese Sandwich is a quick Vegetarian Sandwich (Or Vegan Sandwich) recipe that can be made in minutes with very few ingredients.',
+      calories: 176,
+      totalTime: 25,
+      ingredientsCount: 6,
+      rating: 4.5,
+    );
+
+    return MaterialApp(
+      title: 'Recipe App',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+        fontFamily: 'Poppins', // Make sure to add a font like Poppins
+      ),
+      home: RecipeDetailScreen(recipe: sampleRecipe),
+    );
+  }
+}
+
+
+// --- Data Model for a Recipe ---
+// This class defines the structure of your recipe data.
+class Recipe {
+  final String name;
+  final String author;
+  final String imageUrl;
+  final String description;
+  final int calories;
+  final int totalTime;
+  final int ingredientsCount;
+  final double rating;
+
+  Recipe({
+    required this.name,
+    required this.author,
+    required this.imageUrl,
+    required this.description,
+    required this.calories,
+    required this.totalTime,
+    required this.ingredientsCount,
+    required this.rating,
+  });
+}
+
+
+// --- The Recipe Detail Screen UI ---
+class RecipeDetailScreen extends StatelessWidget {
+  final Recipe recipe;
+
+  const RecipeDetailScreen({super.key, required this.recipe});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Stack(
+        children: [
+          // 1. Background Image
+          Positioned.fill(
+            child: Image.network(
+              recipe.imageUrl,
+              fit: BoxFit.cover,
+            ),
+          ),
+
+          // 2. Back Button
+          Positioned(
+            top: 50,
+            left: 20,
+            child: CircleAvatar(
+              backgroundColor: Colors.white.withOpacity(0.9),
+              child: IconButton(
+                icon: const Icon(Icons.arrow_back, color: Colors.black),
+                onPressed: () {
+                  // In a real app with multiple screens, this would pop the navigator.
+                  // Navigator.of(context).pop();
+                },
+              ),
+            ),
+          ),
+
+          // 3. Draggable Details Card
+          DraggableScrollableSheet(
+            initialChildSize: 0.6, // Start at 60% of the screen height
+            minChildSize: 0.6,
+            maxChildSize: 0.9,
+            builder: (BuildContext context, ScrollController scrollController) {
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(30.0),
+                    topRight: Radius.circular(30.0),
+                  ),
+                ),
+                child: SingleChildScrollView(
+                  controller: scrollController,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Handle to indicate draggable
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 16.0, bottom: 16.0),
+                          child: Container(
+                            width: 50,
+                            height: 5,
+                            decoration: BoxDecoration(
+                              color: Colors.grey[300],
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      // Recipe Title and Favorite Icon
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              recipe.name,
+                              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          const Icon(Icons.favorite_border, color: Colors.grey, size: 28),
+                        ],
+                      ),
+                      Text(recipe.author, style: const TextStyle(color: Colors.grey, fontSize: 16)),
+                      const SizedBox(height: 16),
+
+                      // Star Rating
+                      _buildStarRating(recipe.rating),
+                      const SizedBox(height: 24),
+
+                      // Info Boxes (Calories, Ingredients, Time)
+                      _buildInfoRow(),
+                      const SizedBox(height: 24),
+
+                      // About Section
+                      const Text("About Recipe", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 8),
+                      Text(
+                        recipe.description,
+                        style: const TextStyle(color: Colors.black54, height: 1.5, fontSize: 15),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Reviews Section
+                      const Text("Reviews", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 8),
+                      _buildReviewItem(),
+                      const SizedBox(height: 32),
+
+                      // Cook Now Button
+                      Center(
+                        child: ElevatedButton(
+                          onPressed: () {},
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.black,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 80, vertical: 20),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            elevation: 5,
+                          ),
+                          child: const Text('Cook Now', style: TextStyle(fontSize: 16)),
+                        ),
+                      ),
+                       const SizedBox(height: 20),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStarRating(double rating) {
+    return Row(
+      children: List.generate(5, (index) {
+        return Icon(
+          index < rating ? Icons.star : Icons.star_border,
+          color: Colors.amber,
+          size: 20,
+        );
+      }),
+    );
+  }
+
+  Widget _buildInfoRow() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        _buildInfoItem("Calories", "${recipe.calories} cal"),
+        _buildInfoItem("Ingredients", "${recipe.ingredientsCount}"),
+        _buildInfoItem("Total Time", "${recipe.totalTime} min"),
+      ],
+    );
+  }
+
+  Widget _buildInfoItem(String title, String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey.shade200)
+      ),
+      child: Column(
+        children: [
+          Text(title, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+          const SizedBox(height: 4),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+        ],
+      ),
+    );
+  }
+
+   Widget _buildReviewItem() {
+    return const Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text("Cathrin James", style: TextStyle(fontSize: 16, color: Colors.black54)),
+        Row(
+          children: [
+            Icon(Icons.star, color: Colors.amber, size: 20),
+            SizedBox(width: 4),
+            Text("4.0", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
+        ),
+      ],
+    );
+  }
+}
